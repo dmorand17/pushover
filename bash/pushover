@@ -1,0 +1,56 @@
+#!/bin/bash
+
+set -eo pipefail
+
+SCRIPT_DIR=$(dirname "$0")
+exe() { echo "\$ $@" ; "$@" ; }
+
+help() {
+    echo "Usage: $0 [-t title] [-p priority] -m message"
+    exit 0
+}
+
+while getopts t:p:m:v opt; do
+    case "${opt}" in 
+        t) TITLE=${OPTARG} ;;
+        p) PRIORITY=${OPTARG} ;;
+        m) MESSAGE=${OPTARG} ;;
+        v) VERBOSE="true" ;;
+        ?) help ;; # Print usage for invalid param
+    esac
+done
+
+if [[ -r "${SCRIPT_DIR}/.pushover" ]]; then
+    source "${SCRIPT_DIR}/.pushover"
+fi
+
+if [[ x"$PUSHOVER_TOKEN" = x || x"$PUSHOVER_USER" = x ]]; then
+    echo "PUSHOVER_TOKEN and PUSHOVER_USER must be set"
+    exit 1
+fi
+
+if [[ x"$MESSAGE" = x ]]; then
+    echo "Must supply a message (e.g. -m Testing)"
+    help
+fi
+
+if [[ x"$VERBOSE" = x ]]; then 
+    curl_opts+=(--silent)
+fi
+if [[ ! -z "$TITLE" ]]; then 
+    curl_opts+=(--form-string "title=${TITLE}")
+fi
+if [[ ! -z "$PRIORITY" ]]; then 
+    curl_opts+=(--form-string "priority=${PRIORITY}") 
+fi
+
+curl_opts+=(--form-string "token=${PUSHOVER_TOKEN}")
+curl_opts+=(--form-string "user=${PUSHOVER_USER}")
+curl_opts+=(--form-string "message=${MESSAGE}")
+curl_opts+=(https://api.pushover.net/1/messages.json)
+
+if [[ x"$VERBOSE" != x ]]; then
+    exe curl "${curl_opts[@]}"
+else
+    curl -o /dev/null "${curl_opts[@]}"
+fi
